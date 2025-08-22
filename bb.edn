@@ -1,0 +1,28 @@
+{:deps {io.github.babashka/sci.nrepl
+        {:git/sha "2f8a9ed2d39a1b09d2b4d34d95494b56468f4a23"}
+        
+        io.github.babashka/http-server
+        {:git/sha "b38c1f16ad2c618adae2c3b102a5520c261a7dd3"}}
+
+ :tasks
+ {:requires ([sci.nrepl.browser-server :as bp]
+             [babashka.http-server :as http])
+  
+  browser-nrepl {:doc "Start browser nREPL server"
+                 :task (bp/start! {:nrepl-port 1339 
+                                   :websocket-port 1340})}
+  
+  http-server {:doc "Starts http server for serving static files"
+               :task (do (http/serve {:port 1341 :dir "public"})
+                         (println "Serving static assets at http://localhost:1341"))}
+  
+  dev {:doc "Start development environment with nREPL and http server"
+       :task (do (println "Starting browser nREPL on port 1339 (WebSocket on 1340)...")
+                 (bp/start! {:nrepl-port 1339 :websocket-port 1340})
+                 (println "Starting HTTP server on port 1341...")
+                 (http/serve {:port 1341 :dir "public"})
+                 (println "Development environment ready!")
+                 (println "  HTTP: http://localhost:1341")
+                 (println "  nREPL: localhost:1339")
+                 (println "  WebSocket: localhost:1340")
+                 (deref (promise)))}}}

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Scittle nREPL + Datalevin Database-Native Development</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>Database-Native Clojure Development Environment</h1>
+    <div id="app"></div>
+    
+    <!-- Configure WebSocket port for nREPL -->
+    <script>var SCITTLE_NREPL_WEBSOCKET_PORT = 1340;</script>
+    
+    <!-- Load Scittle from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/scittle@0.7.26/dist/scittle.js" type="application/javascript"></script>
+    
+    <!-- Load nREPL support -->
+    <script src="https://cdn.jsdelivr.net/npm/scittle@0.7.26/dist/scittle.nrepl.js" type="application/javascript"></script>
+    
+    <!-- Our ClojureScript code -->
+    <script type="application/x-scittle">
+      (ns app.core)
+      
+      (println "🚀 Database-Native Development Environment Initialized!")
+      (println "Connected to nREPL via WebSocket on port 1340")
+      
+      ;; Test evaluation
+      (defn greet [name]
+        (str "Hello, " name "! Ready for database-native development!"))
+      
+      (println (greet "Developer"))
+      
+      ;; Update DOM
+      (set! (.-innerHTML (.getElementById js/document "app"))
+            "<p>✅ Scittle nREPL Connected! Open your editor and connect to localhost:1339</p>")
+    </script>
+</body>
+</html>
