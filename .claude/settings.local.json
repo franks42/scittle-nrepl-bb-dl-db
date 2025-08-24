@@ -22,7 +22,12 @@
       "Bash(./scripts/nrepl-eval.bb:*)",
       "Bash(sed:*)",
       "Bash(git checkout:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:nextjournal.github.io)",
+      "WebFetch(domain:ikappaki.github.io)"
     ],
     "deny": [],
     "ask": [],
