@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bb tasks:*)",
+      "Bash(grep:*)",
+      "Bash(bb run:*)",
+      "Read(//Users/franksiebenlist/Development/mcp-nrepl-joyride/src/**)",
+      "Read(//Users/franksiebenlist/Development/mcp-nrepl-joyride/src/nrepl_mcp_server/**)",
+      "Bash(bb:*)",
+      "Read(//Users/franksiebenlist/Development/**)",
+      "Read(//Users/franksiebenlist/Development/**)",
+      "Read(//Users/franksiebenlist/Development/**)",
+      "Read(//Users/franksiebenlist/Development/**)",
+      "Read(//Users/franksiebenlist/Development/mcp-nrepl-joyride/**)",
+      "Read(//Users/franksiebenlist/Development/mcp-nrepl-joyride/**)",
+      "Bash(curl:*)",
+      "Bash(find:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(echo $?)",
+      "WebSearch",
+      "Bash(./scripts/nrepl-eval.bb:*)",
+      "Bash(sed:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "additionalDirectories": [
+      "/Users/franksiebenlist/Development/mcp-nrepl-joyride/src/nrepl_mcp_server/scittle"
+    ]
+  }
+}

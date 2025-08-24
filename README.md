@@ -1,78 +1,58 @@
-# scittle-nrepl-bb-dl-db
+# Scittle
 
-Database-Native Clojure Development Environment combining:
-- **Scittle**: ClojureScript in the browser
-- **nREPL**: Network REPL for remote evaluation
-- **Babashka**: Fast Clojure scripting
-- **Datalevin**: Durable Datalog database
+The [Small Clojure Interpreter](https://github.com/babashka/sci) exposed for usage in script tags.
 
-## Quick Start
+Try it out on [CodePen](https://codepen.io/Prestance/pen/PoOdZQw)!
 
-### 1. Start Development Environment
+See [Github pages](https://babashka.org/scittle/) for usage.
 
-```bash
-# Start both nREPL and HTTP server
-bb dev
+See
+[babashka-scittle-guestbook](https://github.com/kloimhardt/babashka-scittle-guestbook)
+for a minimal full stack web application.
 
-# Or start components separately:
-bb browser-nrepl  # nREPL on 1339, WebSocket on 1340
-bb http-server    # HTTP server on 1341
+See [releases](https://github.com/babashka/scittle/releases) for links to
+[JSDelivr](https://www.jsdelivr.com) to get versioned artifacts.
+
+## Serving assets
+
+To serve assets you can use the
+[babashka.http-server](https://github.com/babashka/http-server) dependency (with
+babashka or Clojure JVM):
+
+``` clojure
+(require '[babashka.http-server :as http])
+(http/serve {:port 1341 :dir "resources/public"})
+@(promise) ;; wait until process is killed
 ```
 
-### 2. Open Browser
+### nREPL
 
-Navigate to http://localhost:1341
+See [doc/nrepl](doc/nrepl).
 
-### 3. Connect Your Editor
+### Service worker
 
-Connect your editor's nREPL client to `localhost:1339`
+See [doc/serviceworker.md](doc/serviceworker.md).
 
-- **CIDER (Emacs)**: `M-x cider-connect-cljs` → Select port 1339 → Choose `nbb` REPL type
-- **Calva (VS Code)**: Connect to Running REPL → Babashka → localhost:1339
-- **Cursive (IntelliJ)**: Remote nREPL → localhost:1339
+## Tasks
 
-## Architecture
+Run `bb tasks` to see all available tasks:
 
 ```
-┌─────────────────┐    WebSocket     ┌──────────────────┐    Pod API    ┌─────────────┐
-│   Browser       │◄────────────────►│  Babashka        │◄─────────────►│  Datalevin  │
-│   Scittle       │      :1340       │  nREPL Server    │               │  Database   │
-└─────────────────┘                  └──────────────────┘               └─────────────┘
-        ▲                                     ▲
-        │                                     │
-    HTTP :1341                           nREPL :1339
-        │                                     │
-        ▼                                     ▼
-    index.html                          Your Editor
+$ bb tasks
+The following tasks are available:
+
+clean   Start from clean slate.
+dev     Development build. Starts webserver and watches for changes.
+prod    Builds production artifacts.
+release Updates Github pages with new release build.
 ```
 
-## Project Structure
+## Credits
 
-```
-.
-├── bb.edn           # Babashka configuration and tasks
-├── public/          # Static files served by HTTP server
-│   └── index.html   # Browser application
-└── README.md        # This file
-```
+Idea by Arne Brasseur a.k.a [plexus](https://github.com/plexus).
 
-## Key Innovation
+## License
 
-This setup enables:
-- **Browser-based ClojureScript** evaluation via Scittle
-- **Remote REPL access** from your favorite editor
-- **Persistent database** integration with Datalevin (coming soon)
-- **Minimal dependencies** - just Babashka and a browser!
+Copyright © 2021 - 2022 Michiel Borkent
 
-## Next Steps
-
-- [ ] Add Datalevin pod integration
-- [ ] Implement database-native code storage
-- [ ] Add CodeMirror editor with Clojure support
-- [ ] Create live dependency management system
-
-## Requirements
-
-- Babashka (bb) installed
-- Modern web browser
-- Your favorite Clojure editor with nREPL support
+Distributed under the EPL License. See LICENSE.

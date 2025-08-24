@@ -1,0 +1,360 @@
+{:deps {org.clojure/clojure {:mvn/version "1.11.1"}
+        cheshire/cheshire {:mvn/version "5.12.0"}
+        nrepl/nrepl {:mvn/version "1.3.1"}
+        hiccup/hiccup {:mvn/version "1.0.5"}}
+
+ :paths ["src"]
+
+ :tasks
+ {;; ═══════════════════════════════════════════════════════════════
+  ;; MCP Server Tasks
+  ;; ═══════════════════════════════════════════════════════════════
+
+  mcp-server
+  {:doc "Start the MCP-nREPL proxy server"
+   :task (clojure "-M" "-m" "mcp-nrepl-proxy.core")}
+
+  dev
+  {:doc "Start server in development mode with debug logging"
+   :task (shell {:env {"MCP_DEBUG" "true"}} "bb" "mcp-server")}
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; Babashka nREPL Server Management
+  ;; ═══════════════════════════════════════════════════════════════
+
+  bb-dev
+  {:doc "Manage Babashka development nREPL server (start|stop|status|restart)"
+   :task (let [cmd (first *command-line-args*)
+               port (or (second *command-line-args*) "1667")
+               pid-file ".bb-nrepl.pid"
+               port-file ".bb-nrepl-port"]
+           (case cmd
+             "start"
+             (do
+               (when (.exists (clojure.java.io/file pid-file))
+                 (println "⚠️  Server already running. Use 'bb run bb-dev stop' first.")
+                 (System/exit 1))
+               (println (str "🚀 Starting Babashka nREPL server on port " port "..."))
+               (let [proc (.start (ProcessBuilder. ["bb" "--nrepl-server" port]))
+                     pid (.pid proc)]
+                 (spit pid-file (str pid))
+                 (spit port-file port)
+                 (Thread/sleep 500)
+                 (if (.isAlive proc)
+                   (println (str "✅ Server started with PID " pid " on port " port))
+                   (do (println "❌ Failed to start server")
+                       (clojure.java.io/delete-file pid-file true)
+                       (System/exit 1)))))
+
+             "stop"
+             (if (.exists (clojure.java.io/file pid-file))
+               (let [pid (slurp pid-file)]
+                 (println (str "🛑 Stopping server with PID " pid "..."))
+                 (shell (str "kill " pid))
+                 (clojure.java.io/delete-file pid-file true)
+                 (clojure.java.io/delete-file port-file true)
+                 (println "✅ Server stopped"))
+               (println "ℹ️  No server running"))
+
+             "status"
+             (if (.exists (clojure.java.io/file pid-file))
+               (let [pid (slurp pid-file)
+                     port (slurp port-file)]
+                 (if (zero? (:exit (shell {:continue true} (str "kill -0 " pid))))
+                   (println (str "✅ Server running with PID " pid " on port " port))
+                   (do
+                     (println "⚠️  PID file exists but process not running")
+                     (clojure.java.io/delete-file pid-file true)
+                     (clojure.java.io/delete-file port-file true))))
+               (println "ℹ️  No server running"))
+
+             "restart"
+             (do
+               (run 'bb-dev "stop")
+               (Thread/sleep 500)
+               (run 'bb-dev "start" port))
+
+             (println "Usage: bb run bb-dev [start|stop|status|restart] [port]")))}
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; nREPL Client Tasks
+  ;; ═══════════════════════════════════════════════════════════════
+
+  nrepl-eval
+  {:doc "Evaluate code on nREPL server"
+   :requires ([babashka.fs :as fs])
+   :task (let [code (first *command-line-args*)
+               port (or (second *command-line-args*)
+                        (when (fs/exists? ".bb-nrepl-port")
+                          (slurp ".bb-nrepl-port"))
+                        "1667")]
+           (if code
+             (shell (str "./nrepl-eval.bb \"" code "\" " port))
+             (println "Usage: bb run nrepl-eval <code> [port]")))}
+
+  nrepl-load-file
+  {:doc "Load a file on nREPL server"
+   :requires ([babashka.fs :as fs])
+   :task (let [file (first *command-line-args*)
+               port (or (second *command-line-args*)
+                        (when (fs/exists? ".bb-nrepl-port")
+                          (slurp ".bb-nrepl-port"))
+                        "1667")]
+           (if file
+             (shell (str "./nrepl-load-file.bb " file " " port))
+             (println "Usage: bb run nrepl-load-file <file> [port]")))}
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; WebSocket Bridge Tasks
+  ;; ═══════════════════════════════════════════════════════════════
+
+  ws-bridge
+  {:doc "Start WebSocket-nREPL bridge server"
+   :task (do
+           (println "🌐 Starting WebSocket-nREPL bridge...")
+           (run 'nrepl-load-file "src/nrepl_mcp_server/scittle/websocket_bridge.clj")
+           (run 'nrepl-eval "(start-websocket-bridge!)"))}
+
+  ws-extension
+  {:doc "Deploy WebSocket extension to running nREPL server"
+   :requires ([babashka.fs :as fs])
+   :task (do
+           (println "🔌 Deploying WebSocket extension...")
+           (let [port (or (when (fs/exists? ".bb-nrepl-port")
+                            (slurp ".bb-nrepl-port"))
+                          "1667")]
+             (shell (str "./nrepl-load-file.bb src/nrepl_mcp_server/scittle/integration.clj " port))
+             (println "✅ WebSocket extension deployed")))}
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; Complete Environment Tasks
+  ;; ═══════════════════════════════════════════════════════════════
+
+  start-complete-env
+  {:doc "Start complete environment: nREPL → WebSocket → HTML → HTTP server"
+   :requires ([babashka.fs :as fs])
+   :task (do
+           (println "🏗️  Starting complete MCP-nREPL Joyride environment...")
+           (println "")
+
+           ;; Step 1: Start nREPL server with dynamic port
+           (println "Step 1/4: Starting nREPL server...")
+           (let [nrepl-port (loop [port 7890]
+                              (try
+                                (with-open [socket (java.net.ServerSocket. port)] port)
+                                (catch Exception _ (recur (inc port)))))
+                 pid-file ".bb-nrepl.pid"
+                 port-file ".bb-nrepl-port"]
+
+             (when (fs/exists? pid-file)
+               (println "⚠️  nREPL server already running")
+               (System/exit 1))
+
+             (println (str "🚀 Starting BB nREPL server on port " nrepl-port))
+             (let [proc (.start (ProcessBuilder. ["bb" "--nrepl-server" (str nrepl-port)]))
+                   pid (.pid proc)]
+               (spit pid-file (str pid))
+               (spit port-file (str nrepl-port))
+               (Thread/sleep 1000)
+               (if (.isAlive proc)
+                 (println (str "✅ nREPL server started (PID: " pid ")"))
+                 (do (println "❌ Failed to start nREPL server")
+                     (fs/delete-if-exists pid-file)
+                     (fs/delete-if-exists port-file)
+                     (System/exit 1)))))
+
+           ;; Step 2: Start WebSocket bridge
+           (println "\nStep 2/4: Starting WebSocket bridge...")
+           (let [nrepl-port (slurp ".bb-nrepl-port")
+                 ws-port (loop [port 8080]
+                           (try
+                             (with-open [socket (java.net.ServerSocket. port)] port)
+                             (catch Exception _ (recur (inc port)))))]
+
+             (println (str "🌐 Starting WebSocket bridge on port " ws-port))
+             (shell (str "./nrepl-load-file.bb src/nrepl_mcp_server/scittle/integration.clj " nrepl-port))
+             (shell (str "./nrepl-eval.bb \"(start-websocket-server! " ws-port ")\" " nrepl-port))
+             (spit ".websocket-port" (str ws-port))
+             (println (str "✅ WebSocket bridge started on port " ws-port)))
+
+           ;; Step 3: Generate HTML page
+           (println "\nStep 3/4: Generating webpage...")
+           (load-file "src/html_generator.clj")
+           (let [nrepl-port (slurp ".bb-nrepl-port")
+                 ws-port (slurp ".websocket-port")
+                 result (html-generator/generate-html-page nrepl-port ws-port)]
+             (println "✅ Generated index.html with embedded ports")
+             (println (str "   nREPL: " (:nrepl-port result)))
+             (println (str "   WebSocket: " (:websocket-port result)))
+             (println (str "   Generated: " (:timestamp result))))
+
+           ;; Step 4: Start HTTP server
+           (println "\nStep 4/4: Starting HTTP server...")
+           (let [port 3000
+                 pid-file ".http-server.pid"]
+             (when (fs/exists? pid-file)
+               (println "⚠️  HTTP server already running")
+               (System/exit 1))
+
+             (println (str "🌍 Starting HTTP server on port " port))
+             (let [proc (.start (ProcessBuilder. ["python3" "-m" "http.server" (str port)]))
+                   pid (.pid proc)]
+               (spit pid-file (str pid))
+               (Thread/sleep 500)
+               (if (.isAlive proc)
+                 (println (str "✅ HTTP server started (PID: " pid ")"))
+                 (do (println "❌ Failed to start HTTP server")
+                     (fs/delete-if-exists pid-file)
+                     (System/exit 1)))))
+
+           (println "\n🎉 Complete environment started!")
+           (println "   Open: http://localhost:3000")
+           (println "   All ports are dynamically allocated and embedded"))}
+
+  stop-complete-env
+  {:doc "Stop all servers and clean up"
+   :requires ([babashka.fs :as fs])
+   :task (do
+           (println "🛑 Stopping complete environment...")
+
+           ;; Stop nREPL server
+           (when (fs/exists? ".bb-nrepl.pid")
+             (let [pid (slurp ".bb-nrepl.pid")]
+               (println (str "Stopping nREPL server (PID: " pid ")"))
+               (shell (str "kill " pid))))
+
+           ;; Stop HTTP server
+           (when (fs/exists? ".http-server.pid")
+             (let [pid (slurp ".http-server.pid")]
+               (println (str "Stopping HTTP server (PID: " pid ")"))
+               (shell (str "kill " pid))))
+
+           ;; Clean up files
+           (doseq [file [".bb-nrepl.pid" ".bb-nrepl-port" ".websocket-port"
+                         ".http-server.pid" "index.html"]]
+             (fs/delete-if-exists file))
+
+           (println "✅ Environment stopped and cleaned up"))}
+
+  env-status
+  {:doc "Show status of complete environment"
+   :requires ([babashka.fs :as fs])
+   :task (do
+           (println "🔍 Environment Status:")
+           (println "")
+
+           ;; nREPL server status
+           (if (fs/exists? ".bb-nrepl.pid")
+             (let [pid (slurp ".bb-nrepl.pid")
+                   port (slurp ".bb-nrepl-port")]
+               (if (zero? (:exit (shell {:continue true} (str "kill -0 " pid))))
+                 (println (str "✅ nREPL server: Running (PID: " pid ", Port: " port ")"))
+                 (println "❌ nREPL server: PID file exists but process dead")))
+             (println "❌ nREPL server: Not running"))
+
+           ;; WebSocket bridge status
+           (if (fs/exists? ".websocket-port")
+             (let [ws-port (slurp ".websocket-port")]
+               (println (str "✅ WebSocket bridge: Port " ws-port " allocated")))
+             (println "❌ WebSocket bridge: Not configured"))
+
+           ;; HTTP server status
+           (if (fs/exists? ".http-server.pid")
+             (let [pid (slurp ".http-server.pid")]
+               (if (zero? (:exit (shell {:continue true} (str "kill -0 " pid))))
+                 (println (str "✅ HTTP server: Running (PID: " pid ", Port: 3000)"))
+                 (println "❌ HTTP server: PID file exists but process dead")))
+             (println "❌ HTTP server: Not running"))
+
+           ;; Generated files
+           (if (fs/exists? "index.html")
+             (println "✅ Generated webpage: Available")
+             (println "❌ Generated webpage: Not found")))}
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; Development & Testing Tasks
+  ;; ═══════════════════════════════════════════════════════════════
+
+  test
+  {:doc "Run tests"
+   :task (clojure "-M:test" "-m" "cognitect.test-runner")}
+
+  dev-repl
+  {:doc "Start development REPL"
+   :task (clojure "-M:nrepl" "-m" "nrepl.cmdline" "--middleware" "[cider.nrepl/cider-middleware]")
+   :override-builtin true}
+
+  build
+  {:doc "Build standalone executable"
+   :task (shell "bb" "uberjar" "mcp-nrepl-proxy.jar" "-m" "mcp-nrepl-proxy.core")}
+
+  test-nrepl-server
+  {:doc "Start real Clojure nREPL server for development"
+   :task (exec "./nrepl-test" "start")}
+
+  joyride-mock-server
+  {:doc "Start enhanced Joyride/Calva mock nREPL server"
+   :task (exec "./joyride-mock-server.clj")}
+
+  test-integration
+  {:doc "Test MCP proxy with test nREPL server"
+   :task (do
+           (println "🧪 Starting integration test...")
+           (println "1. Start test nREPL server: bb test-nrepl-server")
+           (println "2. In another terminal, start MCP server: bb mcp-server")
+           (println "3. Test with: echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}' | bb mcp-server"))}
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; Utility Tasks
+  ;; ═══════════════════════════════════════════════════════════════
+
+  clean
+  {:doc "Clean up PID files and temporary files"
+   :task (do
+           (clojure.java.io/delete-file ".bb-nrepl.pid" true)
+           (clojure.java.io/delete-file ".bb-nrepl-port" true)
+           (clojure.java.io/delete-file ".nrepl-port" true)
+           (clojure.java.io/delete-file ".test-nrepl-server-port" true)
+           (println "✅ Cleaned up PID and port files"))}
+
+  help
+  {:doc "Show available tasks"
+   :task (do
+           (println "\n📚 Available Tasks:\n")
+           (println "🎯 Complete Environment (RECOMMENDED):")
+           (println "  bb run start-complete-env   - Start everything: nREPL → WebSocket → HTML → HTTP")
+           (println "  bb run stop-complete-env    - Stop all servers and clean up")
+           (println "  bb run env-status           - Show status of complete environment")
+           (println "")
+           (println "Server Management:")
+           (println "  bb run bb-dev start [port]  - Start BB nREPL server")
+           (println "  bb run bb-dev stop          - Stop BB nREPL server")
+           (println "  bb run bb-dev status        - Check server status")
+           (println "  bb run bb-dev restart       - Restart server")
+           (println "")
+           (println "nREPL Client:")
+           (println "  bb run nrepl-eval <code>    - Evaluate code")
+           (println "  bb run nrepl-load-file <f>  - Load file")
+           (println "")
+           (println "WebSocket Bridge:")
+           (println "  bb run ws-bridge            - Start WebSocket bridge")
+           (println "  bb run ws-extension         - Deploy WebSocket extension")
+           (println "")
+           (println "Development:")
+           (println "  bb run mcp-server           - Start MCP server")
+           (println "  bb run dev                  - Start in debug mode")
+           (println "  bb run test                 - Run tests")
+           (println "  bb run clean                - Clean temporary files")
+           (println "")
+           (println "🚀 Quick Start:")
+           (println "  bb run start-complete-env   # Everything ready in one command!")
+           (println "  # Open browser: http://localhost:3000")
+           (println ""))}}
+
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
+                      io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}}
+
+  :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}
+                       cider/cider-nrepl {:mvn/version "0.50.2"}}}}}

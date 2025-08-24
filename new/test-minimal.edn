@@ -1,0 +1,6 @@
+{:deps {cheshire/cheshire {:mvn/version "5.12.0"}}
+ :paths ["src"]
+ :tasks
+ {help
+  {:doc "Test help"
+   :task (println "Hello from help!")}}}

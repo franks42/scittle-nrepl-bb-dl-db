@@ -1,0 +1,60 @@
+{:deps {cheshire/cheshire {:mvn/version "5.12.0"}
+        babashka/fs {:mvn/version "0.4.19"}}
+ :paths ["src"]
+ :tasks
+ {clean-env
+  {:doc "Clean up all PID files and servers"
+   :requires ([babashka.fs :as fs])
+   :task (do
+           (println "🧹 Cleaning up environment...")
+           (doseq [file [".bb-nrepl.pid" ".bb-nrepl-port" ".websocket-port" 
+                        ".http-server.pid" "index.html"]]
+             (when (fs/exists? file)
+               (println (str "   Removing " file))
+               (fs/delete file)))
+           (println "✅ Environment cleaned"))}
+  
+  start-nrepl
+  {:doc "Start BB nREPL server with dynamic port"
+   :requires ([babashka.fs :as fs])
+   :task (let [find-port (fn [start-port]
+                          (loop [p start-port]
+                            (if (try
+                                  (with-open [socket (java.net.ServerSocket. p)]
+                                    true)
+                                  (catch Exception _ false))
+                              p
+                              (recur (inc p)))))
+               port (find-port 7890)]
+           (println (str "🚀 Starting BB nREPL server on port " port))
+           (let [proc (.start (ProcessBuilder. ["bb" "--nrepl-server" (str port)]))
+                 pid (.pid proc)]
+             (spit ".bb-nrepl.pid" (str pid))
+             (spit ".bb-nrepl-port" (str port))
+             (Thread/sleep 1000)
+             (if (.isAlive proc)
+               (println (str "✅ nREPL server started (PID: " pid ")"))
+               (println "❌ Failed to start nREPL server"))))}
+  
+  test-nrepl
+  {:doc "Test nREPL server functionality"
+   :task (let [port (slurp ".bb-nrepl-port")]
+           (println (str "🧪 Testing nREPL on port " port))
+           (shell (str "./nrepl-eval.bb \"(+ 1 2 3)\" " port)))}
+           
+  stop-env
+  {:doc "Stop all servers using PID files"
+   :requires ([babashka.fs :as fs]) 
+   :task (do
+           (println "🛑 Stopping environment...")
+           (when (fs/exists? ".bb-nrepl.pid")
+             (let [pid (slurp ".bb-nrepl.pid")]
+               (println (str "Stopping nREPL server PID: " pid))
+               (shell (str "kill " pid))))
+           (when (fs/exists? ".http-server.pid") 
+             (let [pid (slurp ".http-server.pid")]
+               (println (str "Stopping HTTP server PID: " pid))
+               (shell (str "kill " pid))))
+           (run 'clean-env))}
+           
+  help {:doc "Show help" :task (println "Tasks: clean-env, start-nrepl, test-nrepl, stop-env")}}}
