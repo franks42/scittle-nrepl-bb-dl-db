@@ -4,7 +4,7 @@
          '[babashka.fs :as fs]
          '[babashka.process :as p])
 
-(def state-file ".bb-dev-nrepl-server")
+(def state-file ".bb-super-duper-server")
 
 (defn read-state []
   (when (fs/exists? state-file)
@@ -21,7 +21,8 @@
 
 (defn check-existing-server []
   (when-let [state (read-state)]
-    (let [{:keys [pid port]} state]
+    (let [nrepl-main (get-in state [:services :nrepl-main])
+          {:keys [pid port]} nrepl-main]
       (when (and pid (process-running? pid))
         {:running true :pid pid :port port :state state}))))
 
@@ -37,27 +38,31 @@
       (System/exit 1))
     ;; Fork and start server in background
     (let [_ (p/process ["bb" "-e"
-                           (pr-str
-                            `(do
-                               (require '[babashka.nrepl.server :as nrepl])
-                               (let [server# (nrepl/start-server! {:host "localhost" :port 0})
-                                     port# (-> server# :socket (.getLocalPort))
-                                     pid# (.pid (java.lang.ProcessHandle/current))
-                                     started-at# (str (java.time.Instant/now))]
-                                 (spit ~state-file (pr-str {:pid pid#
-                                                            :hostname "localhost"
-                                                            :port port#
-                                                            :started-at started-at#}))
-                                 (println (str "Started nREPL server at localhost:" port#))
-                                 @(promise))))]
-                          {:inherit false})]
+                        (pr-str
+                         `(do
+                            (require '[babashka.nrepl.server :as nrepl])
+                            (let [server# (nrepl/start-server! {:host "localhost" :port 0})
+                                  port# (-> server# :socket (.getLocalPort))
+                                  pid# (.pid (java.lang.ProcessHandle/current))
+                                  started-at# (str (java.time.Instant/now))]
+                              (spit ~state-file (pr-str {:services
+                                                         {:nrepl-main {:pid pid#
+                                                                       :hostname "localhost"
+                                                                       :port port#
+                                                                       :status :running
+                                                                       :started-at started-at#}}
+                                                         :startup-phase :nrepl-main
+                                                         :created-at started-at#}))
+                              (println (str "Started nREPL server at localhost:" port#))
+                              @(promise))))]
+                       {:inherit false})]
       (Thread/sleep 500) ; Give it time to start
       (if-let [{:keys [pid port state]} (check-existing-server)]
         (do
           (binding [*out* *err*]
             (println (str "✅ nREPL server started on localhost:" port " (PID: " pid ")"))
             (println "Server state saved to" state-file))
-          (println (pr-str (assoc state :status :started :state-file state-file))))
+          (println (pr-str (assoc-in state [:services :nrepl-main :status] :started))))
         (do
           (binding [*out* *err*]
             (println "❌ Failed to start nREPL server"))
@@ -90,9 +95,9 @@
     (do
       (binding [*out* *err*]
         (println (str "✅ nREPL server is running on port " port " (PID: " pid ")"))
-        (when-let [started (:started-at state)]
+        (when-let [started (get-in state [:services :nrepl-main :started-at])]
           (println (str "   Started at: " started))))
-      (println (pr-str (assoc state :status :running))))
+      (println (pr-str (assoc-in state [:services :nrepl-main :status] :running))))
     (do
       (binding [*out* *err*]
         (println "ℹ️  No nREPL server is running"))
@@ -103,6 +108,13 @@
     (stop-server))
   (Thread/sleep 500)
   (start-server))
+
+(defn get-server-info
+  "Returns comprehensive server information for nREPL discovery"
+  []
+  (if-let [state (read-state)]
+    (assoc state :status :running :state-file state-file)
+    {:status :not-running :state-file state-file}))
 
 ;; Main command dispatcher
 (let [command (first *command-line-args*)]
