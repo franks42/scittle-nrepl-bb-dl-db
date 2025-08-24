@@ -1,46 +1,26 @@
-{:deps {org.clojure/clojure {:mvn/version "1.11.1"}
-        cheshire/cheshire {:mvn/version "5.12.0"}
-        nrepl/nrepl {:mvn/version "1.3.1"}
-        hiccup/hiccup {:mvn/version "1.0.5"}
-        io.github.babashka/sci.nrepl
-        {:git/sha "2f8a9ed2d39a1b09d2b4d34d95494b56468f4a23"}
-        io.github.babashka/http-server
-        {:git/sha "b38c1f16ad2c618adae2c3b102a5520c261a7dd3"}
-        io.github.paintparty/fireworks {:mvn/version "0.10.3"}}
-
- :paths ["src"]
-
+{:paths ["src"]
  :tasks
- {:requires ([sci.nrepl.browser-server :as bp]
-             [babashka.http-server :as http])
-  
-  browser-nrepl {:doc "Start browser nREPL server"
-                 :task (bp/start! {:nrepl-port 1339 
-                                   :websocket-port 1340})}
-  
-  http-server {:doc "Starts http server for serving static files"
-               :task (do (http/serve {:port 1341 :dir "public"})
-                         (println "Serving static assets at http://localhost:1341"))}
-  
-  dev {:doc "Start development environment with nREPL and http server"
-       :task (do (println "Starting browser nREPL on port 1339 (WebSocket on 1340)...")
-                 (bp/start! {:nrepl-port 1339 :websocket-port 1340})
-                 (println "Starting HTTP server on port 1341...")
-                 (http/serve {:port 1341 :dir "public"})
-                 (println "Development environment ready!")
-                 (println "  HTTP: http://localhost:1341")
-                 (println "  nREPL: localhost:1339")
-                 (println "  WebSocket: localhost:1340")
-                 (deref (promise)))}
-  
+ {bb-dev-nrepl-server
+  {:doc "Manage the single-instance background bb-dev-nrepl server (start|stop|status|restart)"
+   :task (apply shell "bb" "src/bb_dev_nrepl_server.clj" *command-line-args*)}
+
+  test-nrepl-server
+  {:doc "Test all bb-dev-nrepl-server commands"
+   :task (shell "bb" "src/test_bb_dev_nrepl_server.clj")}
+
+  test-nrepl-client
+  {:doc "Test all bb-nrepl-client functionality"
+   :task (shell "bb" "src/test_bb_nrepl_client.clj")}
+
+  nrepl-eval
+  {:doc "Evaluate Clojure code via nREPL"
+   :task (apply shell "bb" "-m" "bb-nrepl-client.eval" *command-line-args*)}
+
+  nrepl-load-file
+  {:doc "Load a Clojure file via nREPL"
+   :task (apply shell "bb" "-m" "bb-nrepl-client.loadfile" *command-line-args*)}
+
   rebel {:doc "Connect to nREPL with Rebel Readline"
          :task (let [port (or (first *command-line-args*) "7890")]
-                 (shell "clojure" "-Sdeps" "{:deps {nrepl/nrepl {:mvn/version \"1.3.0\"} com.bhauman/rebel-readline {:mvn/version \"0.1.4\"}}}" 
-                        "-M" "-m" "rebel-readline.main" "--nrepl-port" port))}
-  
-  fireworks-rebel {:doc "Connect to nREPL with Rebel and Fireworks reminder"
-                   :task (let [port (or (first *command-line-args*) "7890")]
-                           (println "Connecting to nREPL on port" port "with Rebel...")
-                           (println "COPY & PASTE: (require '[fireworks.core :refer [? !? ?> !?>]])")
-                           (shell "clojure" "-Sdeps" "{:deps {nrepl/nrepl {:mvn/version \"1.3.0\"} com.bhauman/rebel-readline {:mvn/version \"0.1.4\"}}}" 
-                                  "-M" "-m" "rebel-readline.main" "--nrepl-port" port))}}}
+                 (shell "clojure" "-Sdeps" "{:deps {nrepl/nrepl {:mvn/version \"1.3.0\"} com.bhauman/rebel-readline {:mvn/version \"0.1.4\"}}}"
+                        "-M" "-m" "rebel-readline.main" "--nrepl-port" port))}}}
