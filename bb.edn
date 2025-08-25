@@ -9,7 +9,10 @@
 
  :paths ["src"]
  :tasks
- {bb-dev-nrepl-server
+ {:requires ([sci.nrepl.browser-server :as bp]
+             [babashka.http-server :as http])
+  
+  bb-dev-nrepl-server
   {:doc "Manage the single-instance background bb-dev-nrepl server (start|stop|status|restart)"
    :task (apply shell "bb" "src/bb_dev_nrepl_server.clj" *command-line-args*)}
 
@@ -29,7 +32,76 @@
   {:doc "Load a Clojure file via nREPL"
    :task (apply shell "bb" "-m" "bb-nrepl-client.loadfile" *command-line-args*)}
 
+  start-nrepl-websocket-bridge
+  {:doc "Start nREPL-WebSocket bridge in the main BB server"
+   :task (do (require '[bb-nrepl-client.loadfile :as loadfile])
+             (let [state (read-string (slurp ".bb-super-duper-server"))
+                   main-port (get-in state [:services :nrepl-main :port])]
+               (loadfile/-main "src/start_websocket_bridge.clj" (str main-port))))}
+
+  start-http-server
+  {:doc "Start HTTP server in the main BB server"
+   :task (do (require '[bb-nrepl-client.loadfile :as loadfile])
+             (let [state (read-string (slurp ".bb-super-duper-server"))
+                   main-port (get-in state [:services :nrepl-main :port])]
+               (loadfile/-main "src/start_http_server.clj" (str main-port))))}
+
+  super-duper-server
+  {:doc "Start complete Super Duper BB Server with FIXED ports"
+   :task (do (println "🎯 Starting Super Duper BB Server with FIXED PORTS...")
+             (println "   • nREPL Bridge: 1339")
+             (println "   • WebSocket: 1340") 
+             (println "   • HTTP Server: 37373")
+             (println "")
+             
+             ;; Ensure main BB server is running
+             (let [state-file ".bb-super-duper-server"]
+               (when-not (.exists (java.io.File. state-file))
+                 (println "❌ Main BB server not running! Start it first with:")
+                 (println "   bb bb-dev-nrepl-server start")
+                 (System/exit 1))
+               
+               (let [state (read-string (slurp state-file))
+                     main-port (get-in state [:services :nrepl-main :port])]
+                 
+                 ;; Start services in main BB server
+                 (println "🔗 Starting nREPL-WebSocket bridge (1339/1340)...")
+                 (shell "bb" "nrepl-load-file" "src/start_websocket_bridge.clj" (str main-port))
+                 
+                 (Thread/sleep 1000) ; Give bridge time to start
+                 
+                 (println "🌐 Starting HTTP server (37373)...")  
+                 (shell "bb" "nrepl-load-file" "src/start_http_server.clj" (str main-port))
+                 
+                 (Thread/sleep 1000) ; Give HTTP server time to start
+                 
+                 (println "🌍 Opening browser...")
+                 (shell "open" "http://localhost:37373/")
+                 
+                 (println "")
+                 (println "✅ SUPER DUPER BB SERVER READY!")
+                 (println "")
+                 (println "🧪 Test the complete chain:")
+                 (println "   bb nrepl-eval '(+ 1 2 3)' 1339")
+                 (println "   bb nrepl-eval '(js/alert \"Hello from Scittle!\")' 1339")
+                 (println "   bb nrepl-eval '(js/console.log \"Check browser console\")' 1339")
+                 (println "   bb nrepl-eval '(browser-test)' 1339"))))}
+
   rebel {:doc "Connect to nREPL with Rebel Readline"
          :task (let [port (or (first *command-line-args*) "7890")]
-                 (shell "clojure" "-Sdeps" "{:deps {nrepl/nrepl {:mvn/version \"1.3.0\"} com.bhauman/rebel-readline {:mvn/version \"0.1.4\"}}}"
-                        "-M" "-m" "rebel-readline.main" "--nrepl-port" port))}}}
+                 (println (str "Connecting to nREPL on port " port "..."))
+                 (shell "clojure" "-Sdeps" "{:deps {com.bhauman/rebel-readline-nrepl {:mvn/version \"0.1.5\"}}}"
+                        "-M" "-m" "rebel-readline.nrepl.main" "-p" port))}
+
+  test-old-working-pattern
+  {:doc "Test the exact working pattern from bb-old.edn"
+   :task (do (println "🔗 Starting browser nREPL on port 1339 (WebSocket on 1340)...")
+             (bp/start! {:nrepl-port 1339 :websocket-port 1340})
+             (println "🌐 Starting HTTP server on port 37373...")
+             (http/serve {:port 37373 :dir "public"})
+             (println "✅ Both services started! Testing WebSocket...")
+             (println "  HTTP: http://localhost:37373")
+             (println "  nREPL: localhost:1339") 
+             (println "  WebSocket: localhost:1340")
+             (shell "open" "http://localhost:37373/")
+             (deref (promise)))}}}}

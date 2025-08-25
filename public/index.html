@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8">
   <title>MCP-nREPL Joyride Environment</title>
+  <!-- Set WebSocket port BEFORE loading Scittle nREPL -->
+  <script>var SCITTLE_NREPL_WEBSOCKET_PORT = 1340;</script>
   <script src="https://unpkg.com/scittle@0.3.10/dist/scittle.js"></script>
+  <script src="https://unpkg.com/scittle@0.3.10/dist/scittle.nrepl.js"></script>
   <style>
     body {
       font-family: system-ui, sans-serif;
@@ -27,6 +30,8 @@
       border-radius: 8px; 
       font-family: 'Courier New', monospace;
       margin: 10px 0;
+      min-height: 100px;
+      white-space: pre-wrap;
     }
     .ports {
       background: #333;
@@ -34,69 +39,73 @@
       border-radius: 8px;
       margin: 10px 0;
     }
+    .test-commands {
+      background: #2a2a2a;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      border: 1px solid #444;
+    }
+    .test-commands code {
+      display: block;
+      background: #000;
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      color: #0f0;
+    }
   </style>
 </head>
 <body>
   <h1>🚀 MCP-nREPL Joyride Environment</h1>
   
   <div class="ports">
-    <h3>🔗 Server Configuration</h3>
-    <div>nREPL Port: <strong>7890</strong></div>
-    <div>WebSocket Port: <strong>8080</strong></div>
-    <div>Generated: <strong>2025-08-23T03:40:32.515280Z</strong></div>
+    <h3>🔗 Server Configuration (Fixed Ports)</h3>
+    <div>nREPL Bridge Port: <strong>1339</strong></div>
+    <div>WebSocket Port: <strong>1340</strong></div>
+    <div>HTTP Server: <strong>37373</strong></div>
   </div>
   
-  <div class="status" id="status">Initializing connection...</div>
-  <div class="output" id="output">Ready for evaluation...</div>
+  <div class="status" id="status">✅ Ready - Using fixed ports</div>
+  <div class="output" id="output">Ready for evaluation...
+</div>
+  
+  <div class="test-commands">
+    <h3>🧪 Test Commands (run from terminal):</h3>
+    <code>bb nrepl-eval '(+ 1 2 3)' 1339</code>
+    <code>bb nrepl-eval '(js/alert "Hello from Scittle!")' 1339</code>
+    <code>bb nrepl-eval '(js/console.log "Check browser console")' 1339</code>
+    <code>bb nrepl-eval '(js/document.getElementById "output").innerHTML)' 1339</code>
+  </div>
+  
+  <script type="application/x-scittle">
+    (println "🎯 Scittle nREPL ready on WebSocket port 1340")
+    (println "✅ Browser-side Clojure evaluation enabled")
+    
+    ;; Add some test functions available in browser
+    (defn browser-test []
+      (str "Browser test at " (.toISOString (js/Date.))))
+    
+    (defn update-output [text]
+      (set! (.-innerHTML (js/document.getElementById "output")) 
+            (str (.-innerHTML (js/document.getElementById "output")) "\n" text)))
+    
+    (println "📝 Available functions: (browser-test) (update-output text)")
+  </script>
   
   <script>
-    // 🎯 Server ports embedded at generation time
-    window.SERVER_PORTS = {
-      nrepl: 7890,
-      websocket: 8080,
-      generated: '2025-08-23T03:40:32.515280Z'
-    };
+    // Log that we're ready with fixed ports
+    console.log('🎯 MCP-nREPL Joyride ready with fixed ports:');
+    console.log('   • nREPL Bridge: 1339');
+    console.log('   • WebSocket: 1340 (SCITTLE_NREPL_WEBSOCKET_PORT)');
+    console.log('   • HTTP Server: 37373');
     
-    console.log('🔗 Connecting to servers:', window.SERVER_PORTS);
-    
-    // WebSocket connection with known port
-    const ws = new WebSocket(`ws://localhost:${window.SERVER_PORTS.websocket}`);
-    
-    ws.onopen = () => {
-      console.log('✅ WebSocket connected');
-      document.getElementById('status').textContent = '✅ Connected to WebSocket server';
-      document.getElementById('status').style.borderColor = '#28a745';
-    };
-    
-    ws.onmessage = (event) => {
-      const output = document.getElementById('output');
-      output.innerHTML += '<div>📨 ' + event.data + '</div>';
-    };
-    
-    ws.onerror = (error) => {
-      console.error('❌ WebSocket error:', error);
-      document.getElementById('status').textContent = '❌ WebSocket connection failed';
-      document.getElementById('status').style.borderColor = '#dc3545';
-    };
-    
-    ws.onclose = () => {
-      console.log('🔌 WebSocket disconnected');
-      document.getElementById('status').textContent = '🔌 WebSocket disconnected';
-      document.getElementById('status').style.borderColor = '#ffc107';
-    };
-    
-    // Scittle initialization
+    // Update status to show connection info
     window.addEventListener('load', () => {
-      console.log('🎨 Scittle environment ready');
-      
-      // Test nREPL connection via WebSocket
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          op: 'eval',
-          code: '(str "Environment loaded at " (java.time.Instant/now))',
-          id: 'startup-test'
-        }));
-      }
+      const statusEl = document.getElementById('status');
+      statusEl.innerHTML = '✅ Ready - Scittle nREPL on WebSocket 1340';
+      statusEl.style.borderColor = '#28a745';
     });
   </script>
 </body>
