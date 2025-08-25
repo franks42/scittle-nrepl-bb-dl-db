@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <title>MCP-nREPL Joyride Environment</title>
   <!-- Set WebSocket port BEFORE loading Scittle nREPL -->
-  <script>var SCITTLE_NREPL_WEBSOCKET_PORT = 1340;</script>
-  <script src="https://unpkg.com/scittle@0.3.10/dist/scittle.js"></script>
-  <script src="https://unpkg.com/scittle@0.3.10/dist/scittle.nrepl.js"></script>
+  <script>var SCITTLE_NREPL_WEBSOCKET_PORT = 1341;</script>
+  <script src="https://unpkg.com/scittle@0.7.27/dist/scittle.js"></script>
+  <script src="https://unpkg.com/scittle@0.7.27/dist/scittle.nrepl.js"></script>
   <style>
     body {
       font-family: system-ui, sans-serif;
@@ -63,11 +63,11 @@
   <div class="ports">
     <h3>🔗 Server Configuration (Fixed Ports)</h3>
     <div>nREPL Bridge Port: <strong>1339</strong></div>
-    <div>WebSocket Port: <strong>1340</strong></div>
+    <div>WebSocket Port: <strong id="websocket-port-display">Loading...</strong></div>
     <div>HTTP Server: <strong>37373</strong></div>
   </div>
   
-  <div class="status" id="status">✅ Ready - Using fixed ports</div>
+  <div class="status" id="status">✅ Ready - Scittle nREPL on WebSocket <span id="status-port">Loading...</span></div>
   <div class="output" id="output">Ready for evaluation...
 </div>
   
@@ -96,15 +96,20 @@
   
   <script>
     // Log that we're ready with fixed ports
-    console.log('🎯 MCP-nREPL Joyride ready with fixed ports:');
+    console.log('🎯 MCP-nREPL Joyride ready with configured ports:');
     console.log('   • nREPL Bridge: 1339');
-    console.log('   • WebSocket: 1340 (SCITTLE_NREPL_WEBSOCKET_PORT)');
+    console.log(`   • WebSocket: ${window.SCITTLE_NREPL_WEBSOCKET_PORT} (SCITTLE_NREPL_WEBSOCKET_PORT)`);
     console.log('   • HTTP Server: 37373');
     
     // Update status to show connection info
     window.addEventListener('load', () => {
+      const actualPort = window.SCITTLE_NREPL_WEBSOCKET_PORT || 'undefined';
+      
+      // Update port displays
+      document.getElementById('websocket-port-display').textContent = actualPort;
+      document.getElementById('status-port').textContent = actualPort;
+      
       const statusEl = document.getElementById('status');
-      statusEl.innerHTML = '✅ Ready - Scittle nREPL on WebSocket 1340';
       statusEl.style.borderColor = '#28a745';
     });
   </script>

@@ -7,7 +7,7 @@
 
 ;; Use fixed ports - no discovery needed
 (let [nrepl-port 1339
-      websocket-port 1340]
+      websocket-port 1341]
   
   (println (str "🔍 Starting bridge on fixed ports..."))
   (println (str "   nREPL: " nrepl-port))
