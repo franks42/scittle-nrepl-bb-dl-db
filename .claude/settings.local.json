@@ -27,7 +27,16 @@
       "Bash(git push:*)",
       "WebFetch(domain:gist.github.com)",
       "WebFetch(domain:nextjournal.github.io)",
-      "WebFetch(domain:ikappaki.github.io)"
+      "WebFetch(domain:ikappaki.github.io)",
+      "Bash(cat:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(cljfmt fix:*)",
+      "Bash(clj-kondo:*)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(git tag:*)",
+      "mcp__memory__store_memory",
+      "mcp__memory__recall_memory"
     ],
     "deny": [],
     "ask": [],

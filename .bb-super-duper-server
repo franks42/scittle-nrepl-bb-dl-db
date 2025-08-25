@@ -1,0 +1,1 @@
+{:services {:nrepl-main {:pid 78698, :hostname "localhost", :port 59153, :status :running, :started-at "2025-08-25T00:57:14.226248Z"}}, :startup-phase :nrepl-main, :created-at "2025-08-25T00:57:14.226248Z"}

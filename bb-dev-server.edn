@@ -1,0 +1,17 @@
+{:server {:name "bb-dev-server"
+          :description "Persistent Babashka development server with nREPL"
+          :nrepl-port 7890
+          :hostname "localhost"
+          :deps {io.github.paintparty/fireworks {:mvn/version "0.10.3"}
+                 org.clojure/clojure {:mvn/version "1.11.1"}
+                 cheshire/cheshire {:mvn/version "5.12.0"}
+                 nrepl/nrepl {:mvn/version "1.3.1"}}}
+ 
+ :pid-file ".bb-dev-server"
+ 
+ :startup-script {:timeout 10000
+                  :check-interval 500}
+ 
+ :logging {:enabled true
+           :file ".bb-dev-server.log"
+           :level "info"}}

@@ -1,0 +1,1 @@
+["^ ","~$start-server",["^ ","~:row",4,"~:col",1,"~:fixed-arities",["~#set",[1]],"~:name","^0","~:ns","~$bb-nrepl-server","~:top-ns","^7","~:type","~:fn"],"~$-main",["^ ","^1",11,"^2",1,"~:varargs-min-arity",0,"^5","^;","^6","^7","^8","^7","^9","^:"],"~:filename","/Users/franksiebenlist/Development/scittle-nrepl-bb-dl-db/src/bb_nrepl_server.clj"]

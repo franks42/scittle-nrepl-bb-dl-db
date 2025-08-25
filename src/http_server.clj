@@ -1,7 +1,56 @@
 (ns http-server
-  "HTTP server functionality with preferred port strategy"
+  "HTTP server functionality with preferred port strategy and API endpoints"
   (:require [org.httpkit.server :as http]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [cheshire.core :as json]))
+
+(defn websocket-discovery-handler
+  "API endpoint for WebSocket port discovery"
+  [request]
+  (try
+    (require 'websocket-service)
+    (let [get-ports-fn (resolve 'websocket-service/get-websocket-ports)
+          ports (if get-ports-fn (get-ports-fn) {:status "service-not-loaded"})]
+      {:status 200
+       :headers {"Content-Type" "application/json"
+                 "Access-Control-Allow-Origin" "*"}
+       :body (json/generate-string ports {:pretty true})})
+    (catch Exception e
+      {:status 500
+       :headers {"Content-Type" "application/json"
+                 "Access-Control-Allow-Origin" "*"}
+       :body (json/generate-string
+               {:status "error"
+                :error (.getMessage e)
+                :message "WebSocket service unavailable"
+                :timestamp (str (java.time.Instant/now))}
+               {:pretty true})})))
+
+(defn server-status-handler
+  "API endpoint for server status"
+  [request]
+  {:status 200
+   :headers {"Content-Type" "application/json"
+             "Access-Control-Allow-Origin" "*"}
+   :body (json/generate-string
+           {:server "Super Duper BB Server"
+            :status "running"
+            :services {:http {:port (get-in request [:server-info :port])}
+                       :nrepl {:status "running"}
+                       :websocket {:status "not-started"}}
+            :timestamp (str (java.time.Instant/now))}
+           {:pretty true})})
+
+(defn api-handler
+  "Handle API endpoints"
+  [request]
+  (let [uri (:uri request)]
+    (case uri
+      "/api/websocket/discovery" (websocket-discovery-handler request)
+      "/api/server/status" (server-status-handler request)
+      {:status 404
+       :headers {"Content-Type" "application/json"}
+       :body (json/generate-string {:error "API endpoint not found" :uri uri})})))
 
 (defn static-file-handler
   "Simple static file handler for resources/public"
@@ -23,11 +72,19 @@
        :headers {"Content-Type" "text/html"}
        :body "<!DOCTYPE html><html><body><h1>404 - File Not Found</h1></body></html>"})))
 
+(defn router
+  "Main request router"
+  [request]
+  (let [uri (:uri request)]
+    (if (.startsWith uri "/api/")
+      (api-handler request)
+      (static-file-handler request))))
+
 (defn try-port
   "Try to start HTTP server on specific port"
   [port]
   (try
-    (let [server (http/run-server static-file-handler {:port port})]
+    (let [server (http/run-server router {:port port})]
       (Thread/sleep 500) ; Give server time to start
       {:port port :status :running :server server
        :url (str "http://localhost:" port "/")})
